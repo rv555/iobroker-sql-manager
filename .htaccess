@@ -1,0 +1,10 @@
+Options -Indexes
+RewriteEngine On
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1)
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+<FilesMatch "^(config|config\.example|lib|messdaten|verdichtung|sicherung|bausteine)\.php$|\.(md|sqlite|bak|py|txt|cmd|gz|lock)$|^\.">
+  Require all denied
+</FilesMatch>
+# Ordner sperren, auch wenn die App in einem Unterpfad liegt (z. B. /sql/tests/)
+RedirectMatch 404 /(tests|data|seiten|werkzeuge|\.claude|\.git)(/|$)

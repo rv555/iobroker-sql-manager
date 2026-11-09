@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sqlman",
+      "runtimeExecutable": "D:/Vinnebox/06_Projekte/02_GitHub/_devtools/php/php.exe",
+      "runtimeArgs": ["-d", "extension=pdo_sqlite", "-S", "127.0.0.1:8082", "-t", "D:/Vinnebox/06_Projekte/02_GitHub/PHP_SQL-Manager"],
+      "port": 8082
+    }
+  ]
+}
