@@ -3,15 +3,17 @@
 *Shows, manages and shrinks time series data in SQL databases written by ioBroker – with graphical reports. (UI and docs in German.)*
 
 Messdaten aus dem **ioBroker-SQL-Adapter** (MySQL/MariaDB) ansehen, Fehlmessungen löschen und **alte Werte verdichten**. Dazu Diagramme, Reports und Rundinstrumente, so dass Grafana entfallen kann.
+Läuft auf Hosting Webspaces auf PHP ohne installation. 
 
-> **Hinweis:** Der Code wurde von einer KI geschrieben (Claude von Anthropic, über Claude Code). Ich habe die Anforderungen beschrieben, Fragen beantwortet und getestet. Das Projekt ist als **Anregung** gedacht, nicht als fertiges, gepflegtes Produkt. Die Arbeitsnotizen der KI stehen in [`CLAUDE.md`](CLAUDE.md).
+> **Hinweis:** Der Code wurde von einer KI geschrieben (Claude Code). Ich habe die Anforderungen beschrieben, Fragen beantwortet und getestet. Das Projekt ist als **Anregung** gedacht, nicht als fertiges, gepflegtes Produkt. Die Arbeitsnotizen der KI stehen in [`CLAUDE.md`](CLAUDE.md).
 >
-> **Stand: Prototyp.** Getestet mit künstlichen Daten (rund 5 Mio. Werte über 2 Jahre), noch nicht lange im Echtbetrieb. **Vor dem ersten Verdichten ein Backup machen**, denn verdichtete Werte lassen sich nicht zurückholen.
+> **Stand: Prototyp.** Getestet mit künstlichen Daten (rund 5 Mio. Werte über 2 Jahre), und mittlerweile im realen Betrieb bei mir. Dennoch: **Vor dem ersten Verdichten ein Backup machen**, denn verdichtete Werte lassen sich nicht zurückholen.
 
 ## Warum?
 
 - Nach dem Hin und Her um InfluxDB 2/3 und Flux sind die Daten jetzt im SQL-Adapter. Der Adapter kann alte Daten aber nur **löschen, nicht verdichten**, und die Tabellen wachsen immer weiter.
-- Für Diagramme brauchte man trotzdem Grafana, also noch einen Dienst mehr.
+- Für Diagramme brauchte man zusätzlich Grafana.
+- Ich wollte den Homeserver einfach halten, da bald ein Update ansteht.
 
 ## Was es kann
 
