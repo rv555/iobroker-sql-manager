@@ -173,8 +173,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     usort($reihen, fn($a, $b) => [$a[0], $a[1]] <=> [$b[0], $b[1]]);
                     $reihen = array_column($reihen, 2);
                     $opt = [];
-                    if (isset(ZUSAMMEN_RASTER[$P('z_raster')])) $opt = ['raster' => $P('z_raster')];
+                    $zr = zusammen_raster($P('z_raster') === 'min' ? trim($P('z_min')) : $P('z_raster'));
+                    if ($zr !== '') $opt = ['raster' => $zr];
                     if (isset($_POST['stapeln'])) $opt['stapeln'] = 1;
+                    if (isset($_POST['halb'])) $opt['halb'] = 1;
                     $hoehe = max(150, min(800, (int)$P('hoehe') ?: 260));
                     $werte = [$P('titel'), $hoehe, json_encode($reihen), json_encode((object)$opt)];
                     if ($id) q("UPDATE diagramme SET titel = ?, hoehe = ?, reihen = ?, optionen = ?, art = 'diagramm' WHERE id = ? AND report = ?", [...$werte, $id, $rep]);
@@ -201,6 +203,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $rep = (int)val('SELECT report FROM diagramme WHERE id = ?', [$id]);
                     q('DELETE FROM diagramme WHERE id = ?', [$id]);
                     weiter('?s=reports&r=' . $rep);
+                case 'diagramm_kopie': // Diagramm oder Anzeige kopieren, ans Ende desselben oder eines anderen Reports
+                    $d = one('SELECT * FROM diagramme WHERE id = ?', [$id]);
+                    $ziel = (int)$P('ziel');
+                    if (!$d || !val('SELECT 1 FROM reports WHERE id = ?', [$ziel])) weiter('?s=reports');
+                    $titel = $ziel === (int)$d['report'] && $d['titel'] !== '' ? $d['titel'] . ' (Kopie)' : $d['titel'];
+                    q('INSERT INTO diagramme (report, pos, art, titel, hoehe, reihen, optionen) VALUES (?, (SELECT COALESCE(MAX(pos), 0) + 1 FROM diagramme WHERE report = ?), ?, ?, ?, ?, ?)',
+                        [$ziel, $ziel, $d['art'], $titel, $d['hoehe'], $d['reihen'], $d['optionen']]);
+                    q('UPDATE reports SET updated = CURRENT_TIMESTAMP, updated_by = ? WHERE id = ?', [uid(), $ziel]);
+                    flash('Kopie angelegt (am Ende des Reports).');
+                    weiter('?s=reports&r=' . $ziel);
                 case 'diagramm_pos': // ein Diagramm nach oben/unten
                     $d = one('SELECT * FROM diagramme WHERE id = ?', [$id]);
                     if ($d) {

@@ -91,6 +91,7 @@ label.haken { display: inline-flex; align-items: center; gap: 5px; margin: 0 12p
 .knopf.haupt:hover { filter: brightness(1.08); }
 .knopf.klein { padding: 2px 8px; font-size: 13px; }
 .knopf.gefahr { color: var(--fehler); }
+.fehlertext { color: var(--fehler); }
 .knopf.an { background: var(--akzent); border-color: var(--akzent); color: var(--akzent-text); }
 .knopfgruppe { display: inline-flex; gap: 0; }
 .knopfgruppe .knopf { border-radius: 0; margin-left: -1px; }
@@ -204,6 +205,12 @@ table.reihen tr.gruppe th { background: var(--flaeche2); color: var(--text); fon
 /* Berichtsansicht: schlanker Kopf, Reports als Menü */
 body.schlank main { max-width: 1600px; }
 .berichtstitel { margin-bottom: 6px; }
+
+/* Diagramme: volle Breite, "halb" = zwei nebeneinander */
+.diagramme { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin: 12px 0; }
+.diagramme > .karte { margin: 0; grid-column: 1 / -1; }
+.diagramme > .karte.halb { grid-column: auto; }
+@media (max-width: 860px) { .diagramme > .karte.halb { grid-column: 1 / -1; } }
 
 /* Anzeigen (Rundinstrumente) nebeneinander */
 .anzeigen { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin: 12px 0; }

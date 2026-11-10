@@ -18,7 +18,7 @@ Läuft auf Hosting Webspaces auf PHP ohne installation.
 ## Was es kann
 
 - **Übersicht** aller Datenpunkte mit letztem Wert, Anzahl, Speicherbedarf und Mini-Diagramm. Eine Warnung erscheint, wenn ein Sensor zu lange schweigt.
-- **Große Diagramme mit Zoom.** Fehlmessungen per Umschalt + Ziehen markieren und löschen. Gelöschte Werte landen im Papierkorb (30 Tage wiederherstellbar).
+- **Große Diagramme mit Zoom.** Fehlmessungen per Umschalt + Ziehen markieren und löschen. Gelöschte Werte landen im Papierkorb (30 Tage wiederherstellbar). Nicht mehr benötigte Reihen lassen sich ganz aus der Datenbank löschen.
 - **Verdichtung in Stufen je Datenpunkt**, per Cron. Beispiel: 45 Tage alles behalten, danach Stundenmittel, nach 2 Jahren Tagesmittel.
   - Methoden: Mittelwert, Summe, letzter Wert, nur Änderungen (Schalter), Löschen.
   - „Kurvenform erhalten“: Es bleiben nur die Punkte, die die Kurve prägen.

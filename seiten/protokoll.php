@@ -2,7 +2,7 @@
 // Protokoll: Läufe, Verdichtungen, Löschungen, Sicherungen, Fehler
 $titel = 'Protokoll';
 const ARTEN = ['lauf' => 'Lauf', 'verdichtung' => 'Verdichtung', 'loeschen' => 'Löschen', 'wiederherstellen' => 'Wiederhergestellt',
-    'abgeleitet' => 'Eigene Reihe', 'backup' => 'Sicherung', 'fehler' => 'Fehler'];
+    'abgeleitet' => 'Eigene Reihe', 'reihe_loeschen' => 'Reihe gelöscht', 'backup' => 'Sicherung', 'fehler' => 'Fehler'];
 $art = isset(ARTEN[$_GET['art'] ?? '']) ? $_GET['art'] : '';
 $nr = max(1, (int)($_GET['n'] ?? 1));
 $w = $art !== '' ? 'WHERE art = ?' : '';

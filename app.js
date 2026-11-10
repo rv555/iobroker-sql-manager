@@ -91,7 +91,7 @@ function diagramm(el, reihen, opt = {}) {
     if (ra === 'monat') return `${zw(d.getMonth() + 1)}.${d.getFullYear()}`;
     if (ra === '1440') return `${zw(d.getDate())}.${zw(d.getMonth() + 1)}.${d.getFullYear()}`;
     if (ra === '10080') { const a = new Date(d.getTime() - 3.5 * 86400000); return `Woche ab ${zw(a.getDate())}.${zw(a.getMonth() + 1)}.${a.getFullYear()}`; }
-    if (ra) { const a = new Date(d.getTime() - (ra === '15' ? 450000 : 1800000)); return zeit(a.getTime()); }
+    if (ra) { const a = new Date(d.getTime() - +ra * 30000); return zeit(a.getTime()); } // Minuten-Raster: Beginn des Rasters
     return zeit(v * 1000, true);
   };
   const series = [{ label: 'Zeit', value: (u, v) => v == null ? '–' : zeitText(v) }];
@@ -207,13 +207,23 @@ function zeitleiste(box, start, laden) {
   let z = start;
   const verlauf = [];
   const setze = (neu, merken = true) => {
-    if (merken) verlauf.push(z);
+    if (merken) { verlauf.push(z); history.pushState({ tiefe: verlauf.length }, ''); }
     z = neu;
     $('#von', box).value = zuFeld(z.von);
     $('#bis', box).value = zuFeld(z.bis);
     $$('#bereiche [data-tage]', box).forEach(b => b.classList.toggle('an', z.tage !== undefined && +b.dataset.tage === z.tage));
     laden(z);
   };
+  // Zurück (↶, Doppelklick, Strg+Z, Zurück-Knopf des Browsers): jeder Zeitwechsel ist ein Eintrag im Browser-Verlauf
+  const zurueck = () => { if (verlauf.length) history.back(); };
+  addEventListener('popstate', e => {
+    const t = e.state?.tiefe ?? 0;
+    if (t < verlauf.length) { const ziel = verlauf[t]; verlauf.length = t; setze(ziel, false); }
+  });
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && verlauf.length
+      && !e.target.closest('input, textarea, select, [contenteditable]')) { e.preventDefault(); zurueck(); }
+  });
   $$('#bereiche [data-tage]', box).forEach(b => b.addEventListener('click', () => {
     const t = +b.dataset.tage, bis = Date.now();
     setze({ von: bis - t * 86400000, bis, tage: t });
@@ -223,11 +233,15 @@ function zeitleiste(box, start, laden) {
     if (!(von < bis)) return alert('Bitte einen gültigen Zeitraum angeben.');
     setze({ von, bis });
   });
-  $('#zurueckzoom', box).addEventListener('click', () => { if (verlauf.length) setze(verlauf.pop(), false); });
+  $('#zurueckzoom', box).addEventListener('click', zurueck);
+  // Neu laden: fester Zeitraum bis "jetzt" rückt mit, sonst derselbe Zeitraum
+  $('#neuladen', box)?.addEventListener('click', () => {
+    if (z.tage !== undefined) { const bis = Date.now(); setze({ von: bis - z.tage * 86400000, bis, tage: z.tage }, false); } else laden(z);
+  });
   setze(z, false);
   return {
     zoom: (von, bis) => setze({ von, bis }),
-    zurueck: () => { if (verlauf.length) setze(verlauf.pop(), false); },
+    zurueck,
     jetzt: () => z,
     neu: () => laden(z),
     ersetze: neu => setze(neu, false),
@@ -401,6 +415,7 @@ function reportSeite(box) {
   };
   anzeigenLaden();
   setInterval(anzeigenLaden, 60000);
+  $('#neuladen', box)?.addEventListener('click', anzeigenLaden);
   // Diagramme alle 5 Minuten neu laden, wenn ein fester Zeitraum bis "jetzt" gewählt ist
   setInterval(() => {
     const z = zl.jetzt();
@@ -453,7 +468,7 @@ function stufenEditor(stufen, opt = {}) {
   const zeile = s => {
     const z = document.createElement('div');
     z.className = 'stufe';
-    z.innerHTML = `<label class="inline">ab <input type="number" class="ab kurz" min="1" max="36500" value="${s.ab ?? 90}"> Tagen</label>
+    z.innerHTML = `<label class="inline">ab <input type="number" class="ab kurz" min="0" max="36500" value="${s.ab ?? 90}" title="0 = sofort (jeweils fertige Raster)"> Tagen</label>
       <select class="m">${methoden.map(([k, m]) => `<option value="${k}"${k === s.m ? ' selected' : ''}>${esc(m[0])}</option>`).join('')}</select>
       <select class="r">${Object.entries(K.raster).map(([k, n]) => `<option value="${k}"${k === String(s.r ?? '60') ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>
       <label class="inline s-feld"><span>Schwelle</span> <input type="text" inputmode="decimal" class="s kurz" value="${s.s ?? 0.5}"></label>
@@ -547,7 +562,11 @@ async function bearbeiten(db, id) {
         <button type="button" class="knopf klein aneu">Anlegen</button></div>
       <p class="leise klein">Die neue Reihe steht in der Tabelle <code>sm_ts</code> (Grafana: Namen in <code>sm_reihen</code>) und wird bei jedem Lauf fortgeschrieben.</p>
     </details>` : ''}
-    ${eigene ? '<p><button type="button" class="knopf klein gefahr aweg">Diese eigene Reihe löschen</button></p>' : ''}
+    <details class="unter"><summary>Reihe ganz löschen</summary>
+      <p class="klein">Löscht <b>alle ${zahl(j.anzahl)} Werte</b> dieser Reihe${eigene ? '' : ' und ihren Eintrag in <code>datapoints</code>'}, dazu die Einstellungen und die Verwendung in Reports.
+        <b>Ohne Papierkorb</b> – zurück nur über ein Backup.${eigene ? '' : ' Vorher in ioBroker die Aufzeichnung (SQL) für diesen Datenpunkt abschalten, sonst schreibt der Adapter weiter Werte.'}</p>
+      ${j.abgeleitete.length ? '<p class="klein fehlertext">Erst die eigenen Reihen löschen, die aus dieser Reihe berechnet werden.</p>' : '<p><button type="button" class="knopf klein gefahr aweg">Reihe ganz löschen …</button></p>'}
+    </details>
     <div class="zeile"><button class="knopf haupt" value="speichern">Speichern</button><button class="knopf" value="abbrechen">Abbrechen</button></div>
   </form>`;
   const f = $('form', d);
@@ -598,8 +617,17 @@ async function bearbeiten(db, id) {
     } catch (e) { fehler(e); }
   });
   $('.aweg', d)?.addEventListener('click', async () => {
-    if (!confirm('Diese eigene Reihe mit allen Werten löschen?')) return;
-    try { await api({ a: 'abgeleitet_loeschen', db, id }); location.href = '?s=start'; } catch (e) { fehler(e); }
+    const b = prompt(`Reihe „${r.titel}“ mit allen ${zahl(j.anzahl)} Werten endgültig löschen?
+
+Zur Bestätigung den Namen eingeben:
+${r.titel}`);
+    if (b === null) return;
+    if (b.trim() !== r.titel) return alert('Der Name stimmt nicht – nichts gelöscht.');
+    try {
+      const x = await api({ a: 'reihe_loeschen', db, id, bestaetigung: b.trim() });
+      alert(`Gelöscht: ${zahl(x.werte)} Werte.`);
+      location.href = '?s=start';
+    } catch (e) { fehler(e); }
   });
   f.addEventListener('submit', async e => {
     if (e.submitter?.value !== 'speichern') return;

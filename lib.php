@@ -7,7 +7,7 @@ date_default_timezone_set('Europe/Berlin');
 // Fehlermeldungen nie im Browser zeigen (verraten Pfade und Code), außer lokal mit 'debug' => true
 ini_set('display_errors', empty($CFG['debug']) ? '0' : '1');
 const SCHEMA = 2;
-const VERSION = 3;            // an style.css/app.js, damit Browser nach dem Hochladen neu laden
+const VERSION = 7;            // an style.css/app.js, damit Browser nach dem Hochladen neu laden
 const MERKEN_TAGE = 60;       // "Angemeldet bleiben": so lange ohne Nutzung, jede Nutzung verlängert
 const MAX_FEHLVERSUCHE = 5;   // danach ist der Login 15 Minuten gesperrt (je Benutzername und je IP)
 const PAPIERKORB_TAGE = 30;   // manuell gelöschte Messwerte bleiben so lange wiederherstellbar

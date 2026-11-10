@@ -9,7 +9,8 @@
   Dort lassen sich auch eigene Reihen berechnen, z. B. „Summe je Monat“ aus Wh-Einzelwerten oder „Verbrauch je Tag“ aus einem Zählerstand.</p>
 <h2>Diagramm einer Reihe</h2>
 <ul>
-  <li>Maus ziehen = hineinzoomen, Doppelklick oder ↶ = vorheriger Zeitraum. Bei vielen Werten zeigt das Diagramm Mittelwerte mit Min/Max-Fläche, beim Hineinzoomen die Einzelwerte.</li>
+  <li>Maus ziehen = hineinzoomen. Zurück zum vorherigen Zeitraum, Schritt für Schritt: Doppelklick ins Diagramm, ↶, <b>Strg+Z</b> oder der Zurück-Knopf des Browsers (bzw. die Zurück-Taste der Maus). Ist der Zeitverlauf am Anfang, geht der Zurück-Knopf wie gewohnt zur vorherigen Seite.
+    ⟳ lädt neu – ein fester Zeitraum wie „3 h“ rückt dabei bis jetzt nach. Bei vielen Werten zeigt das Diagramm Mittelwerte mit Min/Max-Fläche, beim Hineinzoomen die Einzelwerte.</li>
   <li><b>Fehlmessungen löschen (Admin):</b> Umschalt-Taste halten und den Bereich im Diagramm aufziehen – er wird rot markiert und von/bis werden ausgefüllt.
     Optional nur Werte unter/über einem Grenzwert. „Prüfen“ zeigt, wie viele Werte betroffen sind, dann „Löschen“.
     Gelöschtes liegt <?= PAPIERKORB_TAGE ?> Tage im Papierkorb.</li>
@@ -25,7 +26,9 @@
 <p>Ein Report besteht aus Diagrammen und Anzeigen. Der Zeitraum gilt für alle Diagramme; Zoomen in einem Diagramm zoomt alle. Bei einem Zeitraum bis „jetzt“ laden die Diagramme alle 5 Minuten neu, Anzeigen jede Minute.</p>
 <ul>
   <li><b>Diagramm:</b> bis zu 12 Reihen, je Reihe Achse (links/rechts), Darstellung (Linie, Balken, Fläche, Treppe) und auf Wunsch eine eigene Farbe nur in diesem Diagramm.
-    „Werte zusammenfassen“ bildet z. B. die Summe je Tag oder Monat (passend für Balken). „Stapeln“ setzt Balken bzw. Flächen derselben Achse aufeinander.</li>
+    „Werte zusammenfassen“ bildet z. B. die Summe je Tag oder Monat (passend für Balken), mit „je … Minuten“ auch beliebige Minuten (z. B. 6 Minuten: Wh × 10 = mittlere Leistung in W). „Stapeln“ setzt Balken bzw. Flächen derselben Achse aufeinander.
+    „Halbe Breite“: zwei solche Diagramme hintereinander stehen nebeneinander (auf dem Handy untereinander).</li>
+  <li><b>Kopieren:</b> unter „bearbeiten“ eines Diagramms oder einer Anzeige „Kopieren nach“ – in denselben Report (mit „(Kopie)“ im Titel) oder einen anderen, jeweils ans Ende.</li>
   <li><b>Anzeige:</b> aktueller Wert einer Reihe als Rundinstrument mit Skala von–bis und drei Farbbereichen, dazu Min/Max der letzten 24 Stunden.</li>
   <li><b>Farbe einer Reihe:</b> im ✎-Fenster „eigene Farbe“ – gilt in allen Diagrammen und im Mini-Diagramm der Übersicht.</li>
   <li><b>Berichtsansicht:</b> <code>berichte.php</code> zeigt nur die Reports mit kleinem Menü oben und einem Link zurück zum SQL-Manager – gut als Lesezeichen oder auf dem Handy-Startbildschirm. Reihenfolge im Menü: „Reihenfolge“ beim Report.</li>

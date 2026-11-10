@@ -46,7 +46,7 @@ function stufen_sauber(mixed $l): array
     foreach ((array)$l as $s) {
         if (!is_array($s) || !isset(METHODEN[$s['m'] ?? ''])) continue;
         $m = $s['m'];
-        $x = ['ab' => max(1, min(36500, (int)($s['ab'] ?? 90))), 'm' => $m];
+        $x = ['ab' => max($m === 'loeschen' ? 1 : 0, min(36500, (int)($s['ab'] ?? 90))), 'm' => $m];
         if (METHODEN[$m][1]) $x['r'] = isset(RASTER[(string)($s['r'] ?? '')]) ? (string)$s['r'] : '60';
         if (METHODEN[$m][2]) $x['s'] = max(0, (float)str_replace(',', '.', (string)($s['s'] ?? 0.5)));
         $out[] = $x;
@@ -64,10 +64,11 @@ function stufe_text(array $s): string
         'wechsel' => 'nur Änderungen',
         'loeschen' => 'löschen',
     };
-    return 'ab ' . tage_text($s['ab']) . ': ' . $t;
+    return ($s['ab'] ? 'ab ' . tage_text($s['ab']) : 'sofort') . ': ' . $t;
 }
 function tage_text(int $t): string
 {
+    if ($t === 0) return 'sofort';
     if ($t >= 365 && $t % 365 === 0) return ($t / 365) . ' J';
     if ($t >= 30 && $t % 30 === 0 && $t < 365) return ($t / 30) . ' Mon';
     return $t . ' T';

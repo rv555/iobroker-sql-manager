@@ -15,6 +15,7 @@ $titel = $r['titel'];
 <div id="reihe" data-db="<?= h($dbk) ?>" data-id="<?= $r['id'] ?>" data-typ="<?= $r['typ'] ?>" data-admin="<?= (int)$u['admin'] ?>">
   <div class="zeile zeitwahl">
     <span class="knopfgruppe" id="bereiche">
+      <button type="button" class="knopf klein" data-tage="0.0208333">30 min</button><button type="button" class="knopf klein" data-tage="0.125">3 h</button>
       <button type="button" class="knopf klein" data-tage="0.25">6 h</button><button type="button" class="knopf klein" data-tage="1">24 h</button>
       <button type="button" class="knopf klein" data-tage="7">7 Tage</button><button type="button" class="knopf klein" data-tage="30">30 Tage</button>
       <button type="button" class="knopf klein" data-tage="365">1 Jahr</button><button type="button" class="knopf klein" data-tage="3650">Alles</button>
@@ -22,6 +23,7 @@ $titel = $r['titel'];
     <input type="datetime-local" id="von" step="1" aria-label="von"> – <input type="datetime-local" id="bis" step="1" aria-label="bis">
     <button type="button" class="knopf klein" id="anzeigen">Anzeigen</button>
     <button type="button" class="knopf klein" id="zurueckzoom" title="Vorheriger Zeitraum (oder Doppelklick ins Diagramm)">↶</button>
+    <button type="button" class="knopf klein" id="neuladen" title="Neu laden (Zeitraum bis jetzt)">⟳</button>
   </div>
   <div class="karte diagrammkarte"><div id="diagramm" class="diagramm"></div>
     <p class="leise klein" id="diagramminfo"></p></div>

@@ -156,8 +156,16 @@ function daten(string $dbk, array $r, int $von, int $bis, int $punkte = 1500): a
 
 // Werte je Raster zusammengefasst (für Balken, z. B. Strom je Tag): Summe, Mittel, Min oder Max.
 // Ab 1 Stunde: erst stundenweise in SQL, dann nach Ortszeit zu Tagen/Wochen/Monaten/Jahren (Mittel gewichtet nach Anzahl).
-const ZUSAMMEN_RASTER = ['15' => '15 Minuten', '60' => 'Stunde', '1440' => 'Tag', '10080' => 'Woche', 'monat' => 'Monat', 'jahr' => 'Jahr'];
+const ZUSAMMEN_RASTER = ['15' => '15 Minuten', '30' => '30 Minuten', '60' => 'Stunde', '180' => '3 Stunden', '1440' => 'Tag', '10080' => 'Woche', 'monat' => 'Monat', 'jahr' => 'Jahr'];
 const ZUSAMMEN_FKT = ['summe' => 'Summe', 'mittel' => 'Mittelwert', 'min' => 'Minimum', 'max' => 'Maximum'];
+// Raster zum Zusammenfassen: feste Auswahl oder beliebige Minuten (1 bis 1439, z. B. "6")
+function zusammen_raster(string $r): string
+{
+    if (isset(ZUSAMMEN_RASTER[$r])) return $r;
+    return ctype_digit($r) && (int)$r >= 1 && (int)$r < 1440 ? (string)(int)$r : '';
+}
+function gcd_min(int $a, int $b = 60): int { while ($b) [$a, $b] = [$b, $a % $b]; return $a; }
+function zusammen_raster_text(string $r): string { return ZUSAMMEN_RASTER[$r] ?? "$r Minuten"; }
 function daten_zusammen(string $dbk, array $r, int $von, int $bis, string $raster, string $fkt): array
 {
     $m = m($dbk);
@@ -170,7 +178,7 @@ function daten_zusammen(string $dbk, array $r, int $von, int $bis, string $raste
     }
     $grenzen[] = raster_naechst(end($grenzen), $raster);
     if ($r['typ'] === 'bool' && $fkt !== 'summe') return anteil_ein($dbk, $r, $grenzen, min($bis, time() * 1000));
-    $b = $raster === '15' ? 900000 : 3600000;
+    $b = is_numeric($raster) && (int)$raster < 1440 ? gcd_min((int)$raster) * 60000 : 3600000;
     $st = mq($m, "SELECT FLOOR(ts / $b) * $b AS k, SUM(val) s, COUNT(*) n, MIN(val) mi, MAX(val) ma FROM `$t`
         WHERE id = ? AND ts >= ? AND ts < ? GROUP BY FLOOR(ts / $b) ORDER BY k", [$r['id'], $von, end($grenzen)]);
     $sum = [];
@@ -347,6 +355,44 @@ function papierkorb_leeren(?int $pk = null): int
         q("UPDATE papierkorb SET status = 'weg' WHERE id = ?", [$v['id']]);
     }
     return count($l);
+}
+
+// Eine Reihe ganz aus der Datenbank löschen: alle Werte, verdichtete Werte, Papierkorb, Eintrag in datapoints,
+// Einstellungen und Verwendung in Reports. Ohne Papierkorb (nur Backup hilft). Liefert die Anzahl gelöschter Werte.
+// Reihenfolge: erst Werte in Paketen (bricht der Aufruf ab, lässt er sich wiederholen), datapoints und Einstellungen zuletzt.
+function reihe_entfernen(string $dbk, array $r): int
+{
+    $id = (int)$r['id'];
+    $abh = array_filter(reihen_liste($dbk), fn($x) => $x['quelle'] === $id);
+    if ($abh) throw new RuntimeException('Aus dieser Reihe werden eigene Reihen berechnet: „' . implode('“, „', array_column($abh, 'titel'))
+        . '“. Bitte diese zuerst löschen.');
+    $m = m($dbk);
+    $n = 0;
+    $tabellen = $id >= EIGENE_AB ? ['sm_ts'] : ['ts_number', 'ts_bool', 'ts_string'];
+    foreach ([...$tabellen, 'sm_agg', 'sm_papierkorb'] as $t) {
+        if (!hat_tabelle($dbk, $t)) continue;
+        do {
+            $k = mq($m, "DELETE FROM `$t` WHERE id = ? LIMIT 50000", [$id])->rowCount();
+            if ($t !== 'sm_agg' && $t !== 'sm_papierkorb') $n += $k;
+        } while ($k === 50000);
+    }
+    if ($id >= EIGENE_AB) mq($m, 'DELETE FROM sm_reihen WHERE id = ?', [$id]);
+    elseif (hat_tabelle($dbk, 'datapoints')) mq($m, 'DELETE FROM datapoints WHERE id = ?', [$id]);
+
+    db()->beginTransaction();
+    q("UPDATE papierkorb SET status = 'weg' WHERE db = ? AND reihe = ? AND status = 'da'", [$dbk, $id]);
+    foreach (['reihen', 'stand', 'statistik'] as $t) q("DELETE FROM $t WHERE db = ? AND id = ?", [$dbk, $id]);
+    // aus Diagrammen entfernen; Anzeigen dieser Reihe und leere Diagramme fallen weg
+    foreach (all('SELECT id, reihen FROM diagramme') as $d) {
+        $alt = json_decode($d['reihen'], true) ?: [];
+        $neu = array_values(array_filter($alt, fn($x) => !(($x['db'] ?? '') === $dbk && (int)($x['id'] ?? 0) === $id)));
+        if (count($neu) === count($alt)) continue;
+        if ($neu) q('UPDATE diagramme SET reihen = ? WHERE id = ?', [json_encode($neu), $d['id']]);
+        else q('DELETE FROM diagramme WHERE id = ?', [$d['id']]);
+    }
+    db()->commit();
+    protokoll('reihe_loeschen', "Reihe „{$r['titel']}“ ({$r['name']}) ganz gelöscht", $dbk, $id, $n, 0);
+    return $n;
 }
 
 // ---------- Anzeige ----------

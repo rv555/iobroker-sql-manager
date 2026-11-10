@@ -16,7 +16,7 @@ if ($u['pwneu']) antwort(['fehler' => 'Bitte zuerst ein eigenes Passwort festleg
 if (!csrf_ok()) antwort(['fehler' => 'Sitzung abgelaufen, bitte Seite neu laden.', 'login' => 1], 400);
 
 $a = (string)($in['a'] ?? '');
-$schreibend = ['loeschen_pruefen', 'loeschen', 'reihe_laden', 'reihe_speichern', 'vorschau', 'abgeleitet_anlegen', 'abgeleitet_loeschen', 'lauf'];
+$schreibend = ['loeschen_pruefen', 'loeschen', 'reihe_laden', 'reihe_speichern', 'vorschau', 'abgeleitet_anlegen', 'abgeleitet_loeschen', 'reihe_loeschen', 'lauf'];
 if (in_array($a, $schreibend, true) && !$u['admin']) antwort(['fehler' => 'Nur für Admins.'], 403);
 
 function eingabe_db(array $in): string
@@ -64,7 +64,7 @@ try {
         case 'daten': // eine oder mehrere Reihen (Reports): [{db, id, achse, art, farbe}, ...], optional zusammen: {raster, funktion}
             [$von, $bis] = zeitraum($in);
             $zr = (string)($in['zusammen']['raster'] ?? '');
-            if (!isset(ZUSAMMEN_RASTER[$zr])) $zr = '';
+            $zr = zusammen_raster($zr);
             $out = [];
             foreach (array_slice((array)($in['reihen'] ?? []), 0, 12) as $x) {
                 $dbk = (string)($x['db'] ?? '');
@@ -116,6 +116,7 @@ try {
                 'abgeleitete' => array_values(array_map(fn($x) => ['id' => $x['id'], 'titel' => $x['titel'], 'funktion' => FUNKTIONEN[$x['funktion']] ?? '', 'raster' => ABL_RASTER[$x['raster']] ?? ''],
                     array_filter($liste, fn($x) => $x['quelle'] === $r['id']))),
                 'quelle' => $r['quelle'] && isset($liste[$r['quelle']]) ? $liste[$r['quelle']]['titel'] : null,
+                'anzahl' => (int)(statistik($dbk)[$r['id']]['anzahl'] ?? 0),
                 'raster' => RASTER, 'methoden' => METHODEN, 'funktionen' => FUNKTIONEN, 'abl_raster' => ABL_RASTER,
             ]);
 
@@ -174,16 +175,13 @@ try {
             antwort(['id' => $neu, 'werte' => $n]);
 
         case 'abgeleitet_loeschen':
+        case 'reihe_loeschen': // ganze Reihe mit allen Werten, ohne Papierkorb
             [$dbk, $r] = eingabe_reihe($in);
-            if ($r['id'] < EIGENE_AB) antwort(['fehler' => 'Nur eigene Reihen lassen sich löschen.'], 400);
-            mq(m($dbk), 'DELETE FROM sm_ts WHERE id = ?', [$r['id']]);
-            mq(m($dbk), 'DELETE FROM sm_agg WHERE id = ?', [$r['id']]);
-            mq(m($dbk), 'DELETE FROM sm_reihen WHERE id = ?', [$r['id']]);
-            q('DELETE FROM reihen WHERE db = ? AND id = ?', [$dbk, $r['id']]);
-            q('DELETE FROM stand WHERE db = ? AND id = ?', [$dbk, $r['id']]);
-            q('DELETE FROM statistik WHERE db = ? AND id = ?', [$dbk, $r['id']]);
-            protokoll('abgeleitet', "Eigene Reihe „{$r['titel']}“ gelöscht", $dbk, $r['id']);
-            antwort(['ok' => 1]);
+            if ($a === 'abgeleitet_loeschen' && $r['id'] < EIGENE_AB) antwort(['fehler' => 'Nur eigene Reihen lassen sich so löschen.'], 400);
+            if ($a === 'reihe_loeschen' && trim((string)($in['bestaetigung'] ?? '')) !== $r['titel']) antwort(['fehler' => 'Name zur Bestätigung stimmt nicht.'], 400);
+            set_time_limit(600);
+            try { $n = reihe_entfernen($dbk, $r); } catch (RuntimeException $e) { antwort(['fehler' => $e->getMessage()], 400); }
+            antwort(['ok' => 1, 'werte' => $n]);
 
         case 'lauf': // Verdichtung von Hand (probe = nur zählen)
             set_time_limit((int)($CFG['zeitlimit'] ?? 50) + 60);

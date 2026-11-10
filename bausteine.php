@@ -38,9 +38,14 @@ function diagramm_form(int $rep, ?array $d, array $alle): string
         <label class="inline leise">Höhe <input type="number" name="hoehe" value="<?= (int)($d['hoehe'] ?? 260) ?>" min="150" max="800" step="10" class="kurz"> px</label></div>
       <div class="zeile eng">
         <label class="inline leise">Werte zusammenfassen
+          <?php $zr = (string)($o['raster'] ?? ''); $zmin = $zr !== '' && !isset(ZUSAMMEN_RASTER[$zr]); ?>
           <select name="z_raster"><option value="">nein (Verlauf)</option>
-            <?php foreach (ZUSAMMEN_RASTER as $k => $n): ?><option value="<?= $k ?>"<?= ($o['raster'] ?? '') === (string)$k ? ' selected' : '' ?>>je <?= h($n) ?></option><?php endforeach ?></select></label>
+            <?php foreach (ZUSAMMEN_RASTER as $k => $n): ?><option value="<?= $k ?>"<?= $zr === (string)$k ? ' selected' : '' ?>>je <?= h($n) ?></option><?php endforeach ?>
+            <option value="min"<?= $zmin ? ' selected' : '' ?>>je … Minuten:</option></select></label>
+        <label class="inline leise" title="Beliebige Minuten (1 bis 1439), gilt bei „je … Minuten“. Beispiel: 6 Minuten – Wh × 10 = mittlere Leistung in W">
+          <input type="number" name="z_min" min="1" max="1439" value="<?= $zmin ? h($zr) : '' ?>" placeholder="z. B. 6" class="kurz"> min</label>
         <label class="haken"><input type="checkbox" name="stapeln" <?= !empty($o['stapeln']) ? 'checked' : '' ?>> Balken/Flächen stapeln</label>
+        <label class="haken" title="Zwei aufeinanderfolgende Diagramme mit halber Breite stehen nebeneinander (auf dem Handy untereinander)"><input type="checkbox" name="halb" <?= !empty($o['halb']) ? 'checked' : '' ?>> halbe Breite</label>
       </div>
       <input type="search" class="auswahlsuche" placeholder="Reihen filtern …">
       <div class="auswahl">
@@ -63,7 +68,7 @@ function diagramm_form(int $rep, ?array $d, array $alle): string
       <?php endforeach ?>
       </div>
       <p class="leise klein">Höchstens 12 Reihen. Achse: unterschiedliche Einheiten links/rechts. Farbe: Haken = eigene Farbe in diesem Diagramm, sonst die Farbe der Reihe (✎ in der Übersicht).
-        „Zusammenfassen“ bildet z. B. Summen je Tag – passend für Balken; je Reihe Summe, Mittelwert, Min oder Max (auto: Balken/Fläche = Summe, sonst Mittelwert; bei Ein/Aus ist der Mittelwert der Anteil „Ein“). „Stapeln“ setzt Balken bzw. Flächen derselben Achse aufeinander. „Platz“ legt die Reihenfolge fest: 1 liegt beim Stapeln ganz unten, dann 2, 3 … nach oben.</p>
+        „Zusammenfassen“ bildet z. B. Summen je Tag – passend für Balken; je Reihe Summe, Mittelwert, Min oder Max (auto: Balken/Fläche = Summe, sonst Mittelwert; bei Ein/Aus ist der Mittelwert der Anteil „Ein“). „Stapeln“ setzt Balken bzw. Flächen derselben Achse aufeinander. „Halbe Breite“: zwei solche Diagramme hintereinander stehen nebeneinander. „Platz“ legt die Reihenfolge fest: 1 liegt beim Stapeln ganz unten, dann 2, 3 … nach oben.</p>
       <button class="knopf haupt">Diagramm speichern</button>
     </form>
     <?php return ob_get_clean();
@@ -112,10 +117,21 @@ function report_inhalt(array $rep, bool $bearbeiten, array $alle = []): string
           <button class="knopf klein gefahr" data-confirm="„<?= h($d['titel'] ?: 'Diagramm') ?>“ entfernen?">✕</button></form>
         <?php return ob_get_clean();
     };
+    // Kopieren in diesen oder einen anderen Report
+    $berichte = $bearbeiten ? all('SELECT id, name FROM reports ORDER BY pos, name') : [];
+    $kopie = function (array $d) use ($berichte, $rep) {
+        ob_start(); ?>
+        <form method="post" class="zeile eng kopieform"><?= csrf_feld() ?><input type="hidden" name="do" value="diagramm_kopie"><input type="hidden" name="id" value="<?= $d['id'] ?>">
+          <label class="inline leise">Kopieren nach <select name="ziel">
+            <?php foreach ($berichte as $b): ?><option value="<?= $b['id'] ?>"<?= $b['id'] == $rep['id'] ? ' selected' : '' ?>><?= h($b['name']) ?></option><?php endforeach ?></select></label>
+          <button class="knopf klein">Kopieren</button></form>
+        <?php return ob_get_clean();
+    };
     ob_start(); ?>
 <div id="report" data-tage="<?= (int)$rep['tage'] ?>">
   <div class="zeile zeitwahl">
     <span class="knopfgruppe" id="bereiche">
+      <button type="button" class="knopf klein" data-tage="0.0208333">30 min</button><button type="button" class="knopf klein" data-tage="0.125">3 h</button>
       <button type="button" class="knopf klein" data-tage="1">24 h</button><button type="button" class="knopf klein" data-tage="7">7 Tage</button>
       <button type="button" class="knopf klein" data-tage="30">30 Tage</button><button type="button" class="knopf klein" data-tage="90">3 Monate</button>
       <button type="button" class="knopf klein" data-tage="365">1 Jahr</button>
@@ -123,31 +139,38 @@ function report_inhalt(array $rep, bool $bearbeiten, array $alle = []): string
     <input type="datetime-local" id="von" aria-label="von"> – <input type="datetime-local" id="bis" aria-label="bis">
     <button type="button" class="knopf klein" id="anzeigen">Anzeigen</button>
     <button type="button" class="knopf klein" id="zurueckzoom" title="Vorheriger Zeitraum">↶</button>
+    <button type="button" class="knopf klein" id="neuladen" title="Neu laden (Zeitraum bis jetzt)">⟳</button>
     <span class="platz"></span>
     <button type="button" class="knopf klein nodruck" data-print>Drucken</button>
   </div>
-  <?php $offen = false;
+  <?php $offen = ''; // offener Block: '' / 'anzeigen' / 'diagramme'
+  $block = function (string $art) use (&$offen) {
+      if ($offen === $art) return;
+      if ($offen) echo '</div>';
+      if ($art) echo '<div class="' . $art . '">';
+      $offen = $art;
+  };
   foreach ($teile as $d):
     if ($d['art'] === 'anzeige'):
-      if (!$offen) { echo '<div class="anzeigen">'; $offen = true; } ?>
+      $block('anzeigen'); ?>
     <section class="karte anzeigekarte">
       <div class="anzeige" data-anzeige="<?= h($d['reihen']) ?>" data-optionen="<?= h($d['optionen']) ?>" data-titel="<?= h($d['titel']) ?>"></div>
       <?php if ($bearbeiten): ?>
       <div class="zeile eng nodruck"><?= $knoepfe($d) ?></div>
-      <details class="unter nodruck"><summary class="leise klein">bearbeiten</summary><?= anzeige_form((int)$rep['id'], $d, $alle) ?></details>
+      <details class="unter nodruck"><summary class="leise klein">bearbeiten</summary><?= anzeige_form((int)$rep['id'], $d, $alle) ?><?= $kopie($d) ?></details>
       <?php endif ?>
     </section>
   <?php else:
-      if ($offen) { echo '</div>'; $offen = false; } ?>
-  <section class="karte diagrammkarte">
+      $block('diagramme'); $halb = !empty((json_decode($d['optionen'] ?: '{}', true) ?: [])['halb']); ?>
+  <section class="karte diagrammkarte<?= $halb ? ' halb' : '' ?>">
     <div class="zeile eng"><h3><?= h($d['titel'] ?: 'Diagramm') ?></h3><span class="platz"></span><?= $bearbeiten ? $knoepfe($d) : '' ?></div>
     <div class="diagramm" data-diagramm="<?= h($d['reihen']) ?>" data-optionen="<?= h($d['optionen']) ?>" data-hoehe="<?= (int)$d['hoehe'] ?>"></div>
     <?php if ($bearbeiten): ?>
-    <details class="unter nodruck"><summary class="leise klein">Diagramm bearbeiten</summary><?= diagramm_form((int)$rep['id'], $d, $alle) ?></details>
+    <details class="unter nodruck"><summary class="leise klein">Diagramm bearbeiten</summary><?= diagramm_form((int)$rep['id'], $d, $alle) ?><?= $kopie($d) ?></details>
     <?php endif ?>
   </section>
   <?php endif; endforeach;
-  if ($offen) echo '</div>'; ?>
+  $block(''); ?>
   <?php if (!$teile): ?><p class="karte leise">Dieser Report hat noch keine Diagramme.</p><?php endif ?>
 </div>
     <?php return ob_get_clean();
