@@ -74,7 +74,7 @@ try {
                 $k = reihe_kurz($dbk, $r);
                 if ($f = farbe($x['farbe'] ?? null)) $k['farbe'] = $f; // eigene Farbe im Diagramm
                 $k['achse'] = ($x['achse'] ?? 'l') === 'r' ? 'r' : 'l';
-                $k['art'] = in_array($x['art'] ?? '', ['linie', 'balken', 'flaeche', 'stufen'], true) ? $x['art'] : 'linie';
+                $k['art'] = in_array($x['art'] ?? '', ['linie', 'kurve', 'balken', 'flaeche', 'stufen'], true) ? $x['art'] : 'linie';
                 $fkt = isset(ZUSAMMEN_FKT[$x['fkt'] ?? '']) ? $x['fkt'] : (in_array($k['art'], ['balken', 'flaeche'], true) ? 'summe' : 'mittel');
                 $out[] = $k + ($zr !== '' ? daten_zusammen($dbk, $r, $von, $bis, $zr, $fkt) : daten($dbk, $r, $von, $bis, (int)($in['punkte'] ?? 1500) ?: 1500));
             }
@@ -117,7 +117,7 @@ try {
                     array_filter($liste, fn($x) => $x['quelle'] === $r['id']))),
                 'quelle' => $r['quelle'] && isset($liste[$r['quelle']]) ? $liste[$r['quelle']]['titel'] : null,
                 'anzahl' => (int)(statistik($dbk)[$r['id']]['anzahl'] ?? 0),
-                'raster' => RASTER, 'methoden' => METHODEN, 'funktionen' => FUNKTIONEN, 'abl_raster' => ABL_RASTER,
+                'raster' => RASTER, 'methoden' => METHODEN, 'funktionen' => FUNKTIONEN, 'abl_raster' => ABL_RASTER, 'funktionen_wechsel' => FUNKTIONEN_WECHSEL,
             ]);
 
         case 'reihe_speichern':
@@ -161,12 +161,13 @@ try {
             [$dbk, $q] = eingabe_reihe(['db' => $in['db'] ?? '', 'id' => $in['quelle'] ?? 0]);
             $f = (string)($in['funktion'] ?? '');
             $rs = (string)($in['raster'] ?? '');
-            if (!isset(FUNKTIONEN[$f]) || !isset(ABL_RASTER[$rs]) || $q['typ'] === 'bool' || $q['id'] >= EIGENE_AB) antwort(['fehler' => 'Ungültige Angaben.'], 400);
+            $wechsel = in_array($f, FUNKTIONEN_WECHSEL, true);
+            if (!isset(FUNKTIONEN[$f]) || !isset(ABL_RASTER[$rs]) || ($q['typ'] === 'bool' && !$wechsel) || $q['id'] >= EIGENE_AB) antwort(['fehler' => 'Ungültige Angaben.'], 400);
             // Nummern gelöschter eigener Reihen nicht neu vergeben (Grafana-Abfragen zeigen sonst eine andere Reihe)
             $neu = max(EIGENE_AB, (int)val('SELECT MAX(id) FROM reihen WHERE db = ?', [$dbk]) + 1, (int)einst("naechste_$dbk"));
             einst_setzen("naechste_$dbk", (string)($neu + 1));
             $anz = mb_substr(trim((string)($in['anzeige'] ?? '')), 0, 100) ?: $q['titel'] . ' – ' . FUNKTIONEN[$f] . ' je ' . ABL_RASTER[$rs];
-            $einheit = $q['einheit'];
+            $einheit = $wechsel ? '' : $q['einheit'];
             q("INSERT INTO reihen (db, id, name, typ, anzeige, einheit, gruppe, quelle, funktion, raster, updated_by) VALUES (?, ?, ?, 'zahl', ?, ?, ?, ?, ?, ?, ?)",
                 [$dbk, $neu, 'sm.' . $neu, $anz, $einheit, $q['gruppe'], $q['id'], $f, $rs, uid()]);
             mq(m($dbk), 'REPLACE INTO sm_reihen (id, name) VALUES (?, ?)', [$neu, $anz]);

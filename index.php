@@ -177,6 +177,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($zr !== '') $opt = ['raster' => $zr];
                     if (isset($_POST['stapeln'])) $opt['stapeln'] = 1;
                     if (isset($_POST['halb'])) $opt['halb'] = 1;
+                    if (in_array($P('punkte'), ['an', 'aus'], true)) $opt['punkte'] = $P('punkte');
+                    foreach (['l', 'r'] as $a) { // feste Achsengrenzen, leer = automatisch
+                        $g = array_map(fn($k) => is_numeric($v = str_replace(',', '.', trim($P("{$a}_$k")))) ? (float)$v : null, ['min', 'max']);
+                        if ($g[0] !== null && $g[1] !== null && $g[0] >= $g[1]) $g = [null, null];
+                        if ($g !== [null, null]) $opt[$a] = $g;
+                    }
                     $hoehe = max(150, min(800, (int)$P('hoehe') ?: 260));
                     $werte = [$P('titel'), $hoehe, json_encode($reihen), json_encode((object)$opt)];
                     if ($id) q("UPDATE diagramme SET titel = ?, hoehe = ?, reihen = ?, optionen = ?, art = 'diagramm' WHERE id = ? AND report = ?", [...$werte, $id, $rep]);

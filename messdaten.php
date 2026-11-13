@@ -133,6 +133,19 @@ function statistik(string $dbk): array
 
 // ---------- Diagrammdaten ----------
 
+// Ja/Nein-Reihen speichern nur Wechsel: Zustand vor dem Zeitraum an den linken Rand setzen,
+// letzten Zustand bis zum rechten Rand (höchstens bis jetzt) weiterführen
+function bool_raender(PDO $m, string $t, array $r, int $von, int $bis, array $x, array $v): array
+{
+    $vor = mq($m, "SELECT val FROM `$t` WHERE id = ? AND ts < ? AND val IS NOT NULL ORDER BY ts DESC LIMIT 1", [$r['id'], $von])->fetchColumn();
+    if ($vor !== false && (!$x || $x[0] > $von / 1000)) { array_unshift($x, $von / 1000); array_unshift($v, (float)$vor); }
+    $ende = min($bis, time() * 1000) / 1000;
+    $k = count($v) - 1;
+    while ($k >= 0 && $v[$k] === null) $k--;
+    if ($k >= 0 && end($x) < $ende) { $x[] = $ende; $v[] = $v[$k]; }
+    return [$x, $v];
+}
+
 // Werte einer Reihe im Zeitraum (ms). Wenige Werte: Einzelwerte; viele: Mittel/Min/Max je Intervall
 // (bei Ein/Aus ist der Mittelwert der Anteil "Ein" der Schaltwerte).
 // Zeiten in Sekunden (für uPlot).
@@ -145,6 +158,7 @@ function daten(string $dbk, array $r, int $von, int $bis, int $punkte = 1500): a
     if ($n <= ROH_GRENZE) {
         $st = mq($m, "SELECT ts, val FROM `$t` WHERE id = ? AND ts BETWEEN ? AND ? ORDER BY ts LIMIT 200000", [$r['id'], $von, $bis]);
         foreach ($st as $z) { $x[] = $z['ts'] / 1000; $v[] = $z['val'] === null ? null : (float)$z['val']; }
+        if ($r['typ'] === 'bool') [$x, $v] = bool_raender($m, $t, $r, $von, $bis, $x, $v);
         return ['roh' => true, 'n' => $n, 'intervall' => 0, 'x' => $x, 'v' => $v];
     }
     $b = max(60000, (int)ceil(($bis - $von) / $punkte / 60000) * 60000);

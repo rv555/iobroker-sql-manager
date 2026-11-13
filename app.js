@@ -77,7 +77,7 @@ document.addEventListener('mousedown', e => { umschaltZiehen = e.shiftKey; }, tr
 document.addEventListener('mouseup', e => { if (e.shiftKey) umschaltZiehen = true; }, true);
 
 // Diagramm zeichnen. reihen = Antwort der API "daten" (je Reihe optional art: linie/balken/flaeche/stufen, farbe, achse).
-// opt: hoehe, stapeln, zoom(von, bis), zurueck(), markieren(von, bis), mark()
+// opt: hoehe, stapeln, punkte (''/an/aus), achsen {l: [min, max], r: [...]} (null = automatisch), zoom(von, bis), zurueck(), markieren(von, bis), mark()
 function diagramm(el, reihen, opt = {}) {
   el._plot?.destroy();
   el.innerHTML = '';
@@ -96,7 +96,7 @@ function diagramm(el, reihen, opt = {}) {
   };
   const series = [{ label: 'Zeit', value: (u, v) => v == null ? '–' : zeitText(v) }];
   const bands = [];
-  const band = eine && !reihen[0].roh && reihen[0].typ !== 'bool' && (reihen[0].art || 'linie') === 'linie';
+  const band = eine && !reihen[0].roh && reihen[0].typ !== 'bool' && ['linie', 'kurve'].includes(reihen[0].art || 'linie');
   if (eine) {
     const r = reihen[0];
     data = [r.x, r.v];
@@ -129,7 +129,7 @@ function diagramm(el, reihen, opt = {}) {
     const s = {
       label: r.titel + (r.einheit ? ` (${r.einheit})` : ''), stroke: farbe, width: 1.5, scale: r.achse === 'r' ? 'r' : 'y',
       spanGaps: art !== 'balken', value: (u, v, si, k) => wert(k == null ? v : original[i + 1][k], r),
-      points: { show: art === 'linie' && (r.punkte ?? (r.roh && !r.zusammen && r.x.length < 600)), size: 4 },
+      points: { show: opt.punkte === 'aus' ? false : opt.punkte === 'an' ? art !== 'balken' : ['linie', 'kurve'].includes(art) && (r.punkte ?? (r.roh && !r.zusammen && r.x.length < 600)), size: 4 },
     };
     if (art === 'balken') {
       // mehrere Balken ungestapelt: jeder weitere etwas schmaler, damit alle sichtbar bleiben
@@ -137,6 +137,7 @@ function diagramm(el, reihen, opt = {}) {
       s.paths = uPlot.paths.bars({ size: [Math.max(0.25, 0.75 - 0.2 * rang), 80] });
       s.fill = farbe + 'cc'; s.width = 1; s.points = { show: false };
     } else if (art === 'flaeche') { s.fill = farbe + (gestapelt.has(i) ? 'aa' : '40'); }
+    else if (art === 'kurve') { s.paths = uPlot.paths.spline(); } // geglättet, ohne über die Messwerte hinauszuschießen
     else if (art === 'stufen') { s.paths = uPlot.paths.stepped({ align: 1 }); s.width = 1.2; if (eine && r.roh && r.typ === 'bool') s.fill = farbe + '22'; }
     series.push(s);
   });
@@ -153,7 +154,7 @@ function diagramm(el, reihen, opt = {}) {
     // die Wert-Anzeige zeigt jeweils den eigenen (nicht aufsummierten) Wert
     g.forEach((i, k) => { const r = reihen[g[g.length - 1 - k]]; series[i + 1].value = (u, v, si, j) => wert(j == null ? v : original[i + 1][j], r); });
   }
-  const achse = { stroke: css('--leise'), grid: { stroke: css('--linie'), width: 1 }, ticks: { stroke: css('--linie'), width: 1 } };
+  const achse = { stroke: () => css('--achsentext'), grid: { stroke: () => css('--gitter'), width: 1 }, ticks: { stroke: () => css('--achse'), width: 1, size: 5 } };
   const einheit = a => [...new Set(reihen.filter(r => (r.achse === 'r') === a).map(r => r.einheit).filter(Boolean))].join(', ');
   const axes = [{ ...achse, values: zeitachse, space: 70 },
     { ...achse, scale: 'y', size: 60, label: einheit(false) || null, labelSize: 18, values: (u, v) => v.map(x => zahl(x)) }];
@@ -168,6 +169,18 @@ function diagramm(el, reihen, opt = {}) {
   else if (nullAb(false)) scales.y = { range: mitNull };
   if (rechts && reihen.filter(r => r.achse === 'r').every(boolSkala)) scales.r = { range: [-0.1, 1.1] };
   else if (rechts && nullAb(true)) scales.r = { range: mitNull };
+  // feste Grenzen je Achse (Diagramm-Einstellung), leer = automatisch
+  const grenzen = (s, g) => {
+    const lo = g?.[0] ?? null, hi = g?.[1] ?? null;
+    if (lo === null && hi === null) return s;
+    const basis = s?.range;
+    return { range: (u, min, max) => {
+      const [a, b] = typeof basis === 'function' ? basis(u, min, max) : Array.isArray(basis) ? basis : uPlot.rangeNum(min, max, 0.1, true);
+      return [lo ?? a, hi ?? b];
+    } };
+  };
+  scales.y = grenzen(scales.y, opt.achsen?.l);
+  if (rechts) scales.r = grenzen(scales.r, opt.achsen?.r);
   const plot = new uPlot({
     width: el.clientWidth || 600, height: opt.hoehe || 320, series, bands, axes, scales,
     legend: { live: true },
@@ -252,9 +265,27 @@ function zeitleiste(box, start, laden) {
 
 function uebersicht(tab) {
   const db = tab.dataset.db;
+  // Gruppen einklappen (je Datenbank im Browser gemerkt); Umschalt-Klick klappt alle
+  const zuKey = 'zu-' + tab.dataset.db;
+  let zu = []; try { zu = JSON.parse(merk(zuKey) || '[]'); } catch (e) { /* leer */ }
+  const gruppeSetzen = (tb, auf) => {
+    tb.classList.toggle('zu', !auf);
+    const b = $('.gruppenknopf', tb);
+    b.setAttribute('aria-expanded', auf);
+    $('.pfeil', b).textContent = auf ? '▾' : '▸';
+  };
+  $$('tbody[data-gruppe]', tab).forEach(tb => {
+    gruppeSetzen(tb, !zu.includes(tb.dataset.gruppe));
+    $('.gruppenknopf', tb).addEventListener('click', e => {
+      const auf = tb.classList.contains('zu');
+      (e.shiftKey ? $$('tbody[data-gruppe]', tab) : [tb]).forEach(x => gruppeSetzen(x, auf));
+      merk(zuKey, JSON.stringify($$('tbody.zu', tab).map(x => x.dataset.gruppe)));
+    });
+  });
   const suche = $('#suche');
   suche?.addEventListener('input', () => {
     const q = suche.value.trim().toLowerCase();
+    tab.classList.toggle('sucht', !!q); // beim Suchen auch eingeklappte Gruppen durchsuchen
     $$('tbody', tab).forEach(tb => {
       let sichtbar = 0;
       $$('tr[data-id]', tb).forEach(tr => { const an = !q || tr.dataset.suche.includes(q); tr.hidden = !an; sichtbar += an; });
@@ -324,7 +355,7 @@ function reiheSeite(box) {
         api({ a: 'kennzahlen', db, id, von: z.von, bis: z.bis }),
       ]);
       const r = d.reihen[0];
-      diagramm(el, d.reihen, { hoehe: 360, zoom: zl.zoom, zurueck: zl.zurueck, markieren: admin ? markSetzen : null, mark: () => mark });
+      diagramm(el, d.reihen, { hoehe: 360, punkte: $('#punkte')?.value || '', zoom: zl.zoom, zurueck: zl.zurueck, markieren: admin ? markSetzen : null, mark: () => mark });
       info.textContent = !r ? '' : r.roh ? `${zahl(r.n)} Einzelwerte`
         : r.typ === 'bool' ? `${zahl(r.n)} Schaltwerte, angezeigt als Anteil „Ein“ je ${dauerText(r.intervall)}`
         : `${zahl(r.n)} Werte, angezeigt als Mittelwert je ${dauerText(r.intervall)} (Fläche: Minimum bis Maximum)`;
@@ -337,6 +368,8 @@ function reiheSeite(box) {
     } catch (e) { fehler(e); }
     el.classList.remove('laedt');
   };
+  const pw = $('#punkte', box);
+  if (pw) { pw.value = merk('punkte-reihe') || ''; pw.addEventListener('change', () => { merk('punkte-reihe', pw.value); zl.neu(); }); }
   const tage = +(merk('tage-reihe') || 7);
   const zl = zeitleiste(box, { von: Date.now() - tage * 86400000, bis: Date.now(), tage }, laden);
   $$('#bereiche [data-tage]', box).forEach(b => b.addEventListener('click', () => merk('tage-reihe', b.dataset.tage)));
@@ -391,7 +424,7 @@ function reportSeite(box) {
       el.classList.add('laedt');
       try {
         const d = await api({ a: 'daten', reihen, von: z.von, bis: z.bis, punkte: 1000, zusammen: o.raster ? { raster: o.raster } : null });
-        diagramm(el, d.reihen, { hoehe: +el.dataset.hoehe || 260, stapeln: !!o.stapeln, raster: o.raster || '', zoom: zl.zoom, zurueck: zl.zurueck });
+        diagramm(el, d.reihen, { hoehe: +el.dataset.hoehe || 260, stapeln: !!o.stapeln, raster: o.raster || '', punkte: o.punkte || '', achsen: { l: o.l, r: o.r }, zoom: zl.zoom, zurueck: zl.zurueck });
       } catch (e) { el.innerHTML = `<p class="leer">${esc(e.message)}</p>`; }
       el.classList.remove('laedt');
     }));
@@ -408,8 +441,6 @@ function reportSeite(box) {
         const r0 = json(el.dataset.anzeige, [])[0];
         const r = r0 && j.reihen.find(x => x.db === r0.db && x.id === r0.id);
         el.innerHTML = r ? anzeigeSvg(r, json(el.dataset.optionen, {}), el.dataset.titel) : '<p class="leer">Reihe nicht gefunden.</p>';
-        const w = $('.anzeigewert', el);
-        if (w) w.style.color = w.dataset.farbe;
       });
     } catch (e) { /* nächster Versuch in einer Minute */ }
   };
@@ -439,7 +470,6 @@ function anzeigeSvg(r, o, titel) {
   const b1 = g1 === null ? 0 : anteil(g1), b2 = Math.max(b1, g2 === null ? 1 : anteil(g2));
   const zonen = bogen(0, b1, o.f1) + bogen(b1, b2, o.f2) + bogen(b2, 1, o.f3);
   const v = r.wert;
-  const farbe = v === null ? css('--leise') : (g1 !== null && v < g1) ? o.f1 : (g2 !== null && v > g2) ? o.f3 : o.f2;
   let zeiger = '';
   if (v !== null) {
     const [zx, zy] = punkt(anteil(v), R - 4);
@@ -453,7 +483,7 @@ function anzeigeSvg(r, o, titel) {
       <text x="${punkt(0, R)[0]}" y="129" text-anchor="middle" class="gskala">${esc(zahl(von))}</text>
       <text x="${punkt(1, R)[0]}" y="129" text-anchor="middle" class="gskala">${esc(zahl(bis))}</text>
     </svg>
-    <div class="anzeigewert" data-farbe="${esc(farbe)}">${esc(wert(v, r))}</div>
+    <div class="anzeigewert">${esc(wert(v, r))}</div>
     <div class="leise klein${alt ? ' alt' : ''}">${r.ts ? (alt ? '⚠ ' : '') + zeit(r.ts) : 'keine Werte'}${r.min24 !== null ? ` · 24 h: ${esc(zahl(r.min24, st))} – ${esc(zahl(r.max24, st))}` : ''}</div>`;
 }
 
@@ -553,14 +583,15 @@ async function bearbeiten(db, id) {
       <div class="vdiagramm diagramm"></div>
       <p class="vtext klein"></p>
     </div>
-    ${!bool && !eigene ? `<details class="unter"><summary>Eigene Reihe daraus berechnen (z. B. Monatssumme)</summary>
+    ${!eigene ? `<details class="unter"><summary>Eigene Reihe daraus berechnen (z. B. ${bool ? 'Starts je Tag' : 'Monatssumme'})</summary>
       ${j.abgeleitete.length ? '<ul class="klein">' + j.abgeleitete.map(a => `<li>${esc(a.titel)} <span class="leise">(${esc(a.funktion)} je ${esc(a.raster)})</span></li>`).join('') + '</ul>' : ''}
       <div class="zeile eng">
-        <select class="afunk">${Object.entries(K.funktionen).map(([k, n]) => `<option value="${k}">${esc(n)}</option>`).join('')}</select>
+        <select class="afunk">${Object.entries(K.funktionen).filter(([k]) => !bool || j.funktionen_wechsel.includes(k)).map(([k, n]) => `<option value="${k}">${esc(n)}</option>`).join('')}</select>
         je <select class="araster">${Object.entries(K.abl_raster).map(([k, n]) => `<option value="${k}"${k === 'monat' ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>
         <input class="aname" placeholder="Name (optional)">
         <button type="button" class="knopf klein aneu">Anlegen</button></div>
-      <p class="leise klein">Die neue Reihe steht in der Tabelle <code>sm_ts</code> (Grafana: Namen in <code>sm_reihen</code>) und wird bei jedem Lauf fortgeschrieben.</p>
+      <p class="leise klein">„Anzahl Starts“ zählt die Wechsel von 0 (Aus) auf einen anderen Wert (Ein), z. B. Verdichter-Starts je Tag; „Anzahl Stopps“ umgekehrt.
+        Die neue Reihe steht in der Tabelle <code>sm_ts</code> (Grafana: Namen in <code>sm_reihen</code>) und wird bei jedem Lauf fortgeschrieben.</p>
     </details>` : ''}
     <details class="unter"><summary>Reihe ganz löschen</summary>
       <p class="klein">Löscht <b>alle ${zahl(j.anzahl)} Werte</b> dieser Reihe${eigene ? '' : ' und ihren Eintrag in <code>datapoints</code>'}, dazu die Einstellungen und die Verwendung in Reports.
@@ -656,12 +687,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const neu = jetzt === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = neu;
     merk('thema', neu);
-    $$('.diagramm').forEach(el => el._plot?.redraw()); // Farben der Achsen gelten erst nach Neuladen der Daten
+    $$('.diagramm').forEach(el => el._plot?.redraw(false, true)); // Achsen und Gitter in den neuen Farben
   });
   document.addEventListener('click', e => {
     const c = e.target.closest('[data-confirm]');
     if (c && !c.dataset.lauf && !confirm(c.dataset.confirm)) { e.preventDefault(); e.stopPropagation(); return; }
-    if (e.target.closest('[data-print]')) window.print();
     const ed = e.target.closest('[data-edit]');
     if (ed) bearbeiten(($('#reihen') || $('#reihe')).dataset.db, +ed.dataset.edit);
     // Menüs schließen, wenn daneben geklickt wird

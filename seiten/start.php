@@ -45,9 +45,12 @@ $jetzt = time() * 1000;
   <th>Reihe</th><th class="rechts">Letzter Wert</th><th class="rechts" title="Anzahl Werte gesamt">Werte</th><th class="rechts" title="Werte der letzten 30 Tage">30 Tage</th>
   <th class="rechts" title="Speicherbedarf (geschätzt)">MB</th><th class="c-verd">Verdichtung</th><th>Verlauf</th><?php if ($u['admin']): ?><th></th><?php endif ?>
 </tr></thead>
-<?php foreach ($gruppen as $gname => $g): ?>
-<tbody>
-<tr class="gruppe"><th colspan="<?= $u['admin'] ? 8 : 7 ?>"><?= h($gname !== '' ? $gname : 'Ohne Gruppe') ?> <span class="leise">(<?= count($g) ?>)</span></th></tr>
+<?php foreach ($gruppen as $gname => $g):
+    // Reihen mit Warnung (Sensor schweigt zu lange) – auch im eingeklappten Kopf sichtbar
+    $warn = count(array_filter($g, function ($r) use ($letzt, $jetzt) { $l = $letzt[$r['id']][0] ?? null; return $l && $r['warn_std'] && $jetzt - $l > $r['warn_std'] * 3600000; })); ?>
+<tbody data-gruppe="<?= h($gname) ?>">
+<tr class="gruppe"><th colspan="<?= $u['admin'] ? 8 : 7 ?>"><button type="button" class="gruppenknopf" aria-expanded="true" title="Gruppe ein-/ausklappen (Umschalt-Klick: alle)">
+  <span class="pfeil" aria-hidden="true">▾</span> <?= h($gname !== '' ? $gname : 'Ohne Gruppe') ?> <span class="leise">(<?= count($g) ?>)</span><?= $warn ? ' <span class="gruppenwarn">⚠ ' . $warn . '</span>' : '' ?></button></th></tr>
 <?php foreach ($g as $r):
     [$lts, $lv] = $letzt[$r['id']] ?? [null, null];
     $st = $stat[$r['id']] ?? null;

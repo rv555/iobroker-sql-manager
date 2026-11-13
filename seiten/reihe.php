@@ -24,6 +24,7 @@ $titel = $r['titel'];
     <button type="button" class="knopf klein" id="anzeigen">Anzeigen</button>
     <button type="button" class="knopf klein" id="zurueckzoom" title="Vorheriger Zeitraum (oder Doppelklick ins Diagramm)">↶</button>
     <button type="button" class="knopf klein" id="neuladen" title="Neu laden (Zeitraum bis jetzt)">⟳</button>
+    <label class="inline leise">Punkte <select id="punkte" class="klein"><option value="">automatisch</option><option value="an">immer</option><option value="aus">nie</option></select></label>
   </div>
   <div class="karte diagrammkarte"><div id="diagramm" class="diagramm"></div>
     <p class="leise klein" id="diagramminfo"></p></div>

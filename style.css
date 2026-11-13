@@ -1,6 +1,7 @@
 /* Farben, Schriften, Abstände: Anpassungen am Aussehen nur hier oben */
 :root {
   --bg: #f4f6f9; --flaeche: #ffffff; --flaeche2: #eceff4; --text: #1c232b; --leise: #657080; --linie: #d8dde5;
+  --gitter: #eef1f5; --achse: #d5dbe3; --achsentext: #7b8594;
   --akzent: #1f5f99; --akzent-text: #ffffff; --link: #1f5f99;
   --ok: #2f8f46; --fehler: #c62828; --warn: #c62828;
   --schatten: 0 1px 3px rgba(0,0,0,.08);
@@ -10,6 +11,7 @@
 }
 :root[data-theme="dark"] {
   --bg: #13171c; --flaeche: #1c2128; --flaeche2: #262c35; --text: #e3e7ec; --leise: #939ca8; --linie: #343b45;
+  --gitter: #414a58; --achse: #5c6676; --achsentext: #a9b2be;
   --akzent: #5b9be0; --akzent-text: #0f1418; --link: #7db3f0; --ok: #5cc077; --fehler: #ef6b6b; --warn: #ff7b7b;
   --schatten: 0 1px 3px rgba(0,0,0,.4);
   color-scheme: dark;
@@ -17,6 +19,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #13171c; --flaeche: #1c2128; --flaeche2: #262c35; --text: #e3e7ec; --leise: #939ca8; --linie: #343b45;
+    --gitter: #414a58; --achse: #5c6676; --achsentext: #a9b2be;
     --akzent: #5b9be0; --akzent-text: #0f1418; --link: #7db3f0; --ok: #5cc077; --fehler: #ef6b6b; --warn: #ff7b7b;
     --schatten: 0 1px 3px rgba(0,0,0,.4);
     color-scheme: dark;
@@ -128,7 +131,13 @@ table.liste { border-collapse: collapse; width: 100%; background: var(--flaeche)
 
 /* Übersicht */
 table.reihen td { vertical-align: middle; }
-table.reihen tr.gruppe th { background: var(--flaeche2); color: var(--text); font-size: 13px; padding: 5px 8px; }
+table.reihen tr.gruppe th { background: var(--flaeche2); color: var(--text); font-size: 13px; padding: 0; }
+.gruppenknopf { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 5px 8px; cursor: pointer; font-weight: 600; }
+.gruppenknopf:focus-visible { outline: 2px solid var(--akzent); outline-offset: -2px; }
+.gruppenknopf .pfeil { display: inline-block; width: 1em; }
+.gruppenwarn { color: var(--fehler); font-weight: 600; margin-left: 6px; }
+table.reihen tbody.zu tr[data-id] { display: none; }
+table.reihen.sucht tbody.zu tr[data-id]:not([hidden]) { display: table-row; }
 .reihen .c-name a { font-weight: 600; overflow-wrap: anywhere; }
 .reihen .c-name small, .reihen .c-wert small, .reihen .c-verd small { display: block; }
 .reihen .c-wert { white-space: nowrap; font-variant-numeric: tabular-nums; }

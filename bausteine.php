@@ -2,7 +2,7 @@
 // Bausteine für Reports und Berichtsansicht: Reihen-Auswahl, Formulare für Diagramm und Anzeige, Report-Inhalt
 declare(strict_types=1);
 
-const DIAGRAMM_ARTEN = ['linie' => 'Linie', 'balken' => 'Balken', 'flaeche' => 'Fläche', 'stufen' => 'Treppe'];
+const DIAGRAMM_ARTEN = ['linie' => 'Linie', 'kurve' => 'Kurve', 'balken' => 'Balken', 'flaeche' => 'Fläche', 'stufen' => 'Treppe'];
 const ANZEIGE_STANDARD = ['von' => 0, 'bis' => 30, 'g1' => '', 'g2' => '', 'f1' => '#3b82f6', 'f2' => '#22c55e', 'f3' => '#ef4444'];
 
 // Alle Reihen aller Datenbanken für die Auswahl: "db:id" => Name, Gruppe, Einheit, Farbe
@@ -45,7 +45,18 @@ function diagramm_form(int $rep, ?array $d, array $alle): string
         <label class="inline leise" title="Beliebige Minuten (1 bis 1439), gilt bei „je … Minuten“. Beispiel: 6 Minuten – Wh × 10 = mittlere Leistung in W">
           <input type="number" name="z_min" min="1" max="1439" value="<?= $zmin ? h($zr) : '' ?>" placeholder="z. B. 6" class="kurz"> min</label>
         <label class="haken"><input type="checkbox" name="stapeln" <?= !empty($o['stapeln']) ? 'checked' : '' ?>> Balken/Flächen stapeln</label>
+        <label class="inline leise" title="Punkte auf Linien: automatisch = nur bei wenigen Einzelwerten">Punkte
+          <select name="punkte"><?php foreach (['' => 'automatisch', 'an' => 'immer', 'aus' => 'nie'] as $pk => $pn): ?><option value="<?= $pk ?>"<?= ($o['punkte'] ?? '') === $pk ? ' selected' : '' ?>><?= $pn ?></option><?php endforeach ?></select></label>
         <label class="haken" title="Zwei aufeinanderfolgende Diagramme mit halber Breite stehen nebeneinander (auf dem Handy untereinander)"><input type="checkbox" name="halb" <?= !empty($o['halb']) ? 'checked' : '' ?>> halbe Breite</label>
+      </div>
+      <div class="zeile eng">
+        <?php $gz = fn($a, $i) => isset($o[$a][$i]) ? h(str_replace('.', ',', (string)$o[$a][$i])) : ''; ?>
+        <span class="leise" title="Leer = automatisch aus den Werten">Achse links</span>
+        <input type="text" inputmode="decimal" name="l_min" value="<?= $gz('l', 0) ?>" placeholder="min" class="kurz" aria-label="Achse links Minimum">
+        <input type="text" inputmode="decimal" name="l_max" value="<?= $gz('l', 1) ?>" placeholder="max" class="kurz" aria-label="Achse links Maximum">
+        <span class="leise">rechts</span>
+        <input type="text" inputmode="decimal" name="r_min" value="<?= $gz('r', 0) ?>" placeholder="min" class="kurz" aria-label="Achse rechts Minimum">
+        <input type="text" inputmode="decimal" name="r_max" value="<?= $gz('r', 1) ?>" placeholder="max" class="kurz" aria-label="Achse rechts Maximum">
       </div>
       <input type="search" class="auswahlsuche" placeholder="Reihen filtern …">
       <div class="auswahl">
@@ -68,7 +79,7 @@ function diagramm_form(int $rep, ?array $d, array $alle): string
       <?php endforeach ?>
       </div>
       <p class="leise klein">Höchstens 12 Reihen. Achse: unterschiedliche Einheiten links/rechts. Farbe: Haken = eigene Farbe in diesem Diagramm, sonst die Farbe der Reihe (✎ in der Übersicht).
-        „Zusammenfassen“ bildet z. B. Summen je Tag – passend für Balken; je Reihe Summe, Mittelwert, Min oder Max (auto: Balken/Fläche = Summe, sonst Mittelwert; bei Ein/Aus ist der Mittelwert der Anteil „Ein“). „Stapeln“ setzt Balken bzw. Flächen derselben Achse aufeinander. „Halbe Breite“: zwei solche Diagramme hintereinander stehen nebeneinander. „Platz“ legt die Reihenfolge fest: 1 liegt beim Stapeln ganz unten, dann 2, 3 … nach oben.</p>
+        „Zusammenfassen“ bildet z. B. Summen je Tag – passend für Balken; je Reihe Summe, Mittelwert, Min oder Max (auto: Balken/Fläche = Summe, sonst Mittelwert; bei Ein/Aus ist der Mittelwert der Anteil „Ein“). „Stapeln“ setzt Balken bzw. Flächen derselben Achse aufeinander. „Halbe Breite“: zwei solche Diagramme hintereinander stehen nebeneinander. Achse min/max: feste Grenzen, leer = automatisch. „Platz“ legt die Reihenfolge fest: 1 liegt beim Stapeln ganz unten, dann 2, 3 … nach oben.</p>
       <button class="knopf haupt">Diagramm speichern</button>
     </form>
     <?php return ob_get_clean();
@@ -113,6 +124,8 @@ function report_inhalt(array $rep, bool $bearbeiten, array $alle = []): string
         ob_start(); ?>
         <form method="post" class="inline nodruck"><?= csrf_feld() ?><input type="hidden" name="do" value="diagramm_pos"><input type="hidden" name="id" value="<?= $d['id'] ?>">
           <button class="knopf klein" name="r" value="hoch" title="nach vorn">↑</button><button class="knopf klein" name="r" value="runter" title="nach hinten">↓</button></form>
+        <form method="post" class="inline nodruck"><?= csrf_feld() ?><input type="hidden" name="do" value="diagramm_kopie"><input type="hidden" name="id" value="<?= $d['id'] ?>"><input type="hidden" name="ziel" value="<?= $d['report'] ?>">
+          <button class="knopf klein" title="Kopie in diesem Report anlegen (in einen anderen Report: unter „bearbeiten“ → Kopieren nach)">⧉</button></form>
         <form method="post" class="inline nodruck"><?= csrf_feld() ?><input type="hidden" name="do" value="diagramm_del"><input type="hidden" name="id" value="<?= $d['id'] ?>">
           <button class="knopf klein gefahr" data-confirm="„<?= h($d['titel'] ?: 'Diagramm') ?>“ entfernen?">✕</button></form>
         <?php return ob_get_clean();
@@ -141,7 +154,6 @@ function report_inhalt(array $rep, bool $bearbeiten, array $alle = []): string
     <button type="button" class="knopf klein" id="zurueckzoom" title="Vorheriger Zeitraum">↶</button>
     <button type="button" class="knopf klein" id="neuladen" title="Neu laden (Zeitraum bis jetzt)">⟳</button>
     <span class="platz"></span>
-    <button type="button" class="knopf klein nodruck" data-print>Drucken</button>
   </div>
   <?php $offen = ''; // offener Block: '' / 'anzeigen' / 'diagramme'
   $block = function (string $art) use (&$offen) {

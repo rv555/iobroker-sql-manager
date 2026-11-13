@@ -16,7 +16,8 @@ const METHODEN = [
 ];
 // Abgeleitete Reihen: Funktion und Raster
 const FUNKTIONEN = ['summe' => 'Summe', 'mittel' => 'Mittelwert', 'min' => 'Minimum', 'max' => 'Maximum', 'letzter' => 'Letzter Wert',
-    'differenz' => 'Verbrauch aus Zählerstand (Differenz)'];
+    'differenz' => 'Verbrauch aus Zählerstand (Differenz)', 'starts' => 'Anzahl Starts (0 → 1)', 'stopps' => 'Anzahl Stopps (1 → 0)'];
+const FUNKTIONEN_WECHSEL = ['starts', 'stopps']; // zählen Zustandswechsel, auch für Ja/Nein-Reihen
 const ABL_RASTER = ['60' => 'Stunde', '1440' => 'Tag', '10080' => 'Woche', 'monat' => 'Monat', 'jahr' => 'Jahr'];
 
 // ---------- Raster ----------
@@ -301,13 +302,29 @@ function abgeleitet_berechnen(string $dbk, array $a, array $quelle, float $deadl
     $letzt = $m->prepare("SELECT val FROM `$t` WHERE id = ? AND ts < ? ORDER BY ts DESC LIMIT 1");
     $schreib = $m->prepare('REPLACE INTO sm_ts (id, ts, val) VALUES (?, ?, ?)');
     $weg = $m->prepare('DELETE FROM sm_ts WHERE id = ? AND ts = ?');
+    // Starts/Stopps: Wechsel von 0 auf ungleich 0 (bzw. umgekehrt); Zustand vor dem Raster zählt mit
+    $zaehlen = in_array($a['funktion'], FUNKTIONEN_WECHSEL, true);
+    $zustaende = $m->prepare("SELECT val <> 0 FROM `$t` WHERE id = ? AND ts >= ? AND ts < ? AND val IS NOT NULL ORDER BY ts");
+    $vorher = null;
+    if ($zaehlen) {
+        $x = mq($m, "SELECT val <> 0 FROM `$t` WHERE id = ? AND ts < ? AND val IS NOT NULL ORDER BY ts DESC LIMIT 1", [$quelle['id'], $von])->fetchColumn();
+        $vorher = $x === false ? null : (bool)$x;
+    }
     while ($von <= $jetzt) {
         if (microtime(true) > $deadline) break;
         $bis = raster_naechst($von, $rs);
         $agg->execute([$quelle['id'], $von, $bis]);
         $x = $agg->fetch();
         $wert = null;
-        if ((int)$x['n'] > 0) {
+        if ($zaehlen) { // jedes Raster bekommt eine Zahl, auch 0
+            $zustaende->execute([$quelle['id'], $von, $bis]);
+            $wert = 0;
+            foreach ($zustaende->fetchAll(PDO::FETCH_COLUMN) as $an) {
+                $an = (bool)$an;
+                if ($vorher !== null && $an !== $vorher && $an === ($a['funktion'] === 'starts')) $wert++;
+                $vorher = $an;
+            }
+        } elseif ((int)$x['n'] > 0) {
             $wert = match ($a['funktion']) {
                 'summe' => (float)$x['s'], 'mittel' => (float)$x['a'], 'min' => (float)$x['mi'], 'max' => (float)$x['ma'],
                 default => null,
